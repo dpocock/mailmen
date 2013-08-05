@@ -1,0 +1,127 @@
+#!/bin/bash
+set -e
+
+if [ $# -lt 2 ];
+then
+  echo "Please specify tarball and domain, e.g."
+  echo "   $0 mailman-X.Y.Z.tar.gz example.org"
+  exit 1
+fi
+
+MM_DOMAIN="$2"
+# if lists are in lists.example.org, then it is probably
+# obvious that the URL is for a list server web site
+# and therefore MM_WEB_DOMAIN == MM_DOMAIN:
+MM_WEB_DOMAIN=${MM_DOMAIN}
+#MM_WEB_DOMAIN=lists.${MM_DOMAIN}
+PREFIX_BASE=/var/lib/mailmen
+PREFIX="${PREFIX_BASE}/${MM_DOMAIN}"
+MM_USER=list
+MM_GROUP=list
+MM_MAIL_GID=daemon
+MM_CGI_GID=www-data
+
+SCRIPT_NAME=$(readlink -f $0)
+SCRIPT_DIR=`dirname $SCRIPT_NAME`
+
+BUILD_TMP=`mktemp -d`
+
+function cleanup {
+  if [ ! -z "${BUILD_TMP}" ];
+  then
+    rm -rf "${BUILD_TMP}"
+  fi
+}
+
+trap cleanup EXIT
+
+echo "Using temporary workspace $BUILD_TMP ..."
+
+SRC_TARBALL=$(readlink -f "$1")
+echo "Using SRC_TARBALL $SRC_TARBALL"
+
+cd "${BUILD_TMP}"
+tar xzf "${SRC_TARBALL}"
+
+SRC_TREE=`pwd`/`ls -d mailman-2*`
+
+DESTDIR="${BUILD_TMP}/dest"
+mkdir -p ${DESTDIR}
+
+echo "Entering $SRC_TREE for build..."
+
+cd "${SRC_TREE}"
+
+./configure --prefix="${PREFIX}" \
+  --with-username=${MM_USER} --with-groupname=${MM_GROUP} \
+  --with-mail-gid=${MM_MAIL_GID} --with-cgi-gid=${MMCGI_GID} \
+  --without-permcheck --with-mailhost=${MM_DOMAIN} \
+  --with-urlhost=${MM_WEB_DOMAIN}
+
+mkdir -p ${DESTDIR}/usr/share/images/mailman
+
+make
+make doinstall prefix=${DESTDIR}${PREFIX} \
+                var_prefix=${DESTDIR}${PREFIX} \
+                icondir=${DESTDIR}/usr/share/images/mailman \
+                ICONDIR=${DESTDIR}/usr/share/images/mailman
+
+rm -rf ${DESTDIR}${PREFIX}/tests \
+  ${DESTDIR}${PREFIX}/bin/msgfmt.py
+
+cd ${DESTDIR}
+mkdir -p etc/cron.d etc/init.d
+mkdir -p var/log/mailmen/${MM_DOMAIN}
+cat ${SCRIPT_DIR}/mailman-crontab | \
+  sed -e "s!/usr/lib/mailman!${PREFIX}!" > etc/cron.d/mailmen-${MM_DOMAIN}
+INIT_DOMAIN=`echo ${MM_DOMAIN} | tr '.' '-'`
+INIT_SCRIPT_NAME=mailmen-${INIT_DOMAIN}
+cat ${SCRIPT_DIR}/mailman-init | \
+  sed -e "s!/usr/lib/mailman!${PREFIX}!" \
+      -e "s!/var/lib/mailman!${PREFIX}!" \
+      -e "s!/var/run/mailman!/var/run/mailmen-${MM_DOMAIN}!" \
+      -e "s!/var/lock/mailman!/var/lock/mailmen-${MM_DOMAIN}!" \
+      -e "s!INIT_SCRIPT_NAME!${INIT_SCRIPT_NAME}!" \
+      -e "s!mailman-qrunner!mailmen-qrunner-${INIT_DOMAIN}!" \
+    > etc/init.d/${INIT_SCRIPT_NAME}
+chmod a+x etc/init.d/${INIT_SCRIPT_NAME}
+
+# fix permissions (requires fakeroot environment!)
+chown -R root:root .
+chown -R root:list ./${PREFIX}
+chown -R list:list ./${PREFIX}/qfiles
+chown -R root:list var/log/mailmen/${MM_DOMAIN}
+chmod 2770 var/log/mailmen/${MM_DOMAIN}
+find ./${PREFIX} -path ./${PREFIX}/messages \
+  -prune -o -type d -exec chmod 2775 {} \;
+
+chmod +x ./${PREFIX}/Mailman/Cgi/*
+chmod +x ./${PREFIX}/Mailman/Archiver/pipermail.py
+
+chmod g+s ./${PREFIX}/cgi-bin/*
+chmod g+s ./${PREFIX}/mail/mailman
+
+chmod -x ./${PREFIX}/scripts/paths.py 
+
+chmod o-rx ./${PREFIX}/archives/private
+chown list:www-data ./${PREFIX}/archives/private
+chmod 0755 ./${PREFIX}/cron/*
+chmod 0644 ./${PREFIX}/cron/{crontab.in,paths.py}
+
+rmdir ./${PREFIX}/locks
+ln -s /var/lock/mailmen-${MM_DOMAIN} ./${PREFIX}/locks
+mkdir -p var/lock/mailmen-${MM_DOMAIN}
+chown root:list var/lock/mailmen-${MM_DOMAIN}
+chmod 2775 var/lock/mailmen-${MM_DOMAIN}
+mkdir -p var/run/mailmen-${MM_DOMAIN}
+chown list:list var/run/mailmen-${MM_DOMAIN}
+rmdir ./${PREFIX}/logs
+ln -s /var/log/mailmen/${MM_DOMAIN} ./${PREFIX}/logs
+
+# we don't want or need the files in usr/ as we use the files
+# put there by the Debian package (they can be shared between
+# multiple instances)
+rm -rf ./usr
+
+tar czf /tmp/mailman-${MM_DOMAIN}.tar.gz .
+
