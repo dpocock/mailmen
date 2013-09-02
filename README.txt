@@ -83,6 +83,10 @@ The enclosed script "gen-mapped-aliases" automates this.
 
    Manually check the results in /etc/mailmen
 
+   NOTE: this script must be run every time a new list is created
+         with newlist or through the web.  Consider running
+         it from cron.
+
 10. Reload the mailer after adding any new virtual domain:
 
       service postfix reload
