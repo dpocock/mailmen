@@ -1,0 +1,60 @@
+#!/bin/bash
+
+set -e
+
+PREFIX_BASE=/var/lib/mailmen
+# this value MUST match the value given to configure ---with-mail-gid
+# when Mailman was built:
+MM_MAIL_GID=daemon
+
+ALIASES_FILE=/etc/mailmen/mapped-aliases
+#ALIASES_FILE=mm-mapped-aliases
+VALIASES_FILE=/etc/mailmen/mapped-virtual
+
+echo "# generated `date`" > ${ALIASES_FILE}
+echo "# generated `date`" > ${VALIASES_FILE}
+
+for PREFIX in ${PREFIX_BASE}/* ;
+do
+
+  DOMAIN=`basename $PREFIX`
+
+  for list_dir in ${PREFIX}/lists/* ;
+  do
+    
+    list_name=`basename ${list_dir}`
+    list_name_full=${list_name}@${DOMAIN}
+    list_name_alias=${DOMAIN}-${list_name}
+    echo "${list_name_full} ${list_name_alias}" >> ${VALIASES_FILE}
+    echo "${list_name_alias} \"|${PREFIX}/mail/mailman post ${list_name}\"" \
+        >> ${ALIASES_FILE}
+
+    for cmd in admin bounces confirm join leave owner request subscribe unsubscribe ;
+    do
+      email_full=${list_name}-${cmd}@${DOMAIN}
+      email_alias=${DOMAIN}-${list_name}-${cmd}
+      echo "${email_full} ${email_alias}" >> ${VALIASES_FILE}
+      echo "${email_alias} \"|${PREFIX}/mail/mailman ${cmd} ${list_name}\"" \
+        >> ${ALIASES_FILE}
+    done
+
+  done
+
+done
+
+postmap ${ALIASES_FILE}
+postmap ${VALIASES_FILE}
+# this is essential, Postfix will run any scripts listed in the alias
+# file using the UID/GID of the file's owner
+# if Mailman bounces messages with something like
+#   Group mismatch error.  Mailman expected the mail wrapper
+#   script to be executed as group "daemon", but the system's mail server
+#   executed the mail script as group "nogroup".
+# then you need to check who owns this file:
+chgrp "${MM_MAIL_GID}" ${ALIASES_FILE}.db
+
+# this is also essential, if Postfix sees the file with the wrong owner
+# it will refuse to run the scripts.  reload/restart causes Postfix to
+# re-discover the permissions on the files:
+service postfix reload
+
