@@ -11,6 +11,11 @@ ALIASES_FILE=/etc/mailmen/mapped-aliases
 #ALIASES_FILE=mm-mapped-aliases
 VALIASES_FILE=/etc/mailmen/mapped-virtual
 
+# if the box is not a dedicated mailer (e.g. it forwards mail for
+# its own users in a null-client configuration) then you need
+# to explicitly configure a domain that it will use here
+#ALIAS_SUFFIX="@list-server.example.org"
+
 echo "# generated `date`" > ${ALIASES_FILE}
 echo "# generated `date`" > ${VALIASES_FILE}
 
@@ -25,7 +30,7 @@ do
     list_name=`basename ${list_dir}`
     list_name_full=${list_name}@${DOMAIN}
     list_name_alias=${DOMAIN}-${list_name}
-    echo "${list_name_full} ${list_name_alias}" >> ${VALIASES_FILE}
+    echo "${list_name_full} ${list_name_alias}${ALIAS_SUFFIX}" >> ${VALIASES_FILE}
     echo "${list_name_alias} \"|${PREFIX}/mail/mailman post ${list_name}\"" \
         >> ${ALIASES_FILE}
 
