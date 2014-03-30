@@ -77,11 +77,21 @@ The enclosed script "gen-mapped-aliases" automates this.
 
       chown -R list /var/lib/mailmen/*/archives/*
 
-9. Reload the mailer after adding any new virtual domain:
+9. Update the aliases file for the mailer
+
+      Run the enclosed gen-mapped-aliases script
+
+   Manually check the results in /etc/mailmen
+
+   NOTE: this script must be run every time a new list is created
+         with newlist or through the web.  Consider running
+         it from cron.
+
+10. Reload the mailer after adding any new virtual domain:
 
       service postfix reload
 
-10. Add Mailman config to the Apache virtual host, note that you must
+11. Add Mailman config to the Apache virtual host, note that you must
     use the cgi-bin path corresponding to the virtual host.
 
     See the files apache2.conf and apache2-vhost.conf for
