@@ -54,7 +54,7 @@ cd "${SRC_TREE}"
 
 ./configure --prefix="${PREFIX}" \
   --with-username=${MM_USER} --with-groupname=${MM_GROUP} \
-  --with-mail-gid=${MM_MAIL_GID} --with-cgi-gid=${MMCGI_GID} \
+  --with-mail-gid=${MM_MAIL_GID} --with-cgi-gid=${MM_CGI_GID} \
   --without-permcheck --with-mailhost=${MM_DOMAIN} \
   --with-urlhost=${MM_WEB_DOMAIN}
 
