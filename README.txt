@@ -39,14 +39,18 @@ The enclosed script "gen-mapped-aliases" automates this.
 
       apt-get source mailman
 
-   or just download from the Mailman web site.
+   or just download from the Mailman web site. If you are using
+   apt-get you may need to execute 'apt-get install dpkg-dev' before
+   the source download will work.
 
 4. Build a custom instance for each domain, e.g.:
 
       fakeroot ./make-mailman mailman_2.1.15.orig.tar.gz lists.example.org
 
    If you are not on Debian, you may need to tweak "make-mailman", particularly
-   the environment variables at the beginning.
+   the environment variables at the beginning. If you get an error
+   message about Python Distutils, execute 'apt-get install python-dev
+   python-setuptools'
 
    You will find tarballs under /tmp for each of your domains, e.g.
    /tmp/mailman-lists.example.org.tar.gz
@@ -59,7 +63,7 @@ The enclosed script "gen-mapped-aliases" automates this.
 
 6. Enable the service for each domain:
 
-      update-rc.d mailmen-lists-example-org start 20 2 3 4 5 .
+      update-rc.d mailmen-lists-example-org defaults 20 2 3 4 5 .
 
 7. Create the site list for each domain:
 
